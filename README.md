@@ -1,1 +1,1 @@
-# Assembly, annotation and taxonomocal classification of a Bacillus strain.
+# Assembly, annotation and taxonomical classification of a Bacillus strain.
