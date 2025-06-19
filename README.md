@@ -1,1 +1,1 @@
-# Ensamblaje-anotaci-n-y-clasificaci-n-taxon-mica-de-una-cepa-de-Bacillus
+# Assembly, annotation and taxonomocal classification of a Bacillus strain.
