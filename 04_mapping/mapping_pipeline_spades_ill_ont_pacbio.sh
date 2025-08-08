@@ -1,66 +1,66 @@
 #!/bin/bash
 
-## === PASO 1: Configuración inicial ===
-# Define la ubicación del archivo de ensamblaje bacteriano
-ENSAMBLAJE="results/assemblies/spades_full/contigs.fasta"
+## === STEP 1: Initial Setup ===
+# Define the path to the bacterial assembly file
+ASSEMBLY="results/assemblies/spades_full/contigs.fasta"
 
-# Crea la estructura de directorios para los resultados
+# Create directory structure for the results
 mkdir -p results/mapping/spades_full/{illumina,ont,pacbio}
 
-## === PASO 2: Indexado del ensamblaje ===
-echo "1/5 - Creando índice del ensamblaje de referencia..."
-minimap2 -d referencia.mmi $ENSAMBLAJE
-# Esto crea un archivo de índice (referencia.mmi) para acelerar los alineamientos posteriores
+## === STEP 2: Indexing the Assembly ===
+echo "1/5 - Creating reference assembly index..."
+minimap2 -d reference.mmi $ASSEMBLY
+# This creates an index file (reference.mmi) to speed up downstream alignments
 
-## === PASO 3: Procesamiento de datos Illumina ===
-echo "2/5 - Procesando lecturas Illumina (paired-end)..."
-minimap2 -ax sr $ENSAMBLAJE \
+## === STEP 3: Processing Illumina Data ===
+echo "2/5 - Processing Illumina reads (paired-end)..."
+minimap2 -ax sr $ASSEMBLY \
   data/processed/illumina/illumina_output_R1_paired.fastq \
   data/processed/illumina/illumina_output_R2_paired.fastq | \
 samtools view -bS - | \
 samtools sort -o results/mapping/spades_full/illumina/illumina_mapped.sorted.bam
-# -ax sr: indica que son lecturas cortas (short reads)
-# El pipeline: alineamiento → conversión a BAM → ordenamiento por posición genómica
+# -ax sr: indicates short reads
+# Pipeline: alignment → BAM conversion → genomic position sorting
 
-# Indexado y generación de estadísticas
+# Indexing and generating statistics
 samtools index results/mapping/spades_full/illumina/illumina_mapped.sorted.bam
 samtools flagstat results/mapping/spades_full/illumina/illumina_mapped.sorted.bam > results/mapping/spades_full/illumina/illumina_flagstat.txt
 samtools coverage results/mapping/spades_full/illumina/illumina_mapped.sorted.bam > results/mapping/spades_full/illumina/illumina_coverage.txt
 
-## === PASO 4: Procesamiento de datos Oxford Nanopore ===
-echo "3/5 - Procesando lecturas Oxford Nanopore..."
-minimap2 -ax map-ont $ENSAMBLAJE \
+## === STEP 4: Processing Oxford Nanopore Data ===
+echo "3/5 - Processing Oxford Nanopore reads..."
+minimap2 -ax map-ont $ASSEMBLY \
   data/processed/corrected/ont_trim_504_trim_end_34499_minlen_1000_CORRECTED.fasta | \
 samtools view -bS - | \
 samtools sort -o results/mapping/spades_full/ont/ont_mapped.sorted.bam
-# -ax map-ont: parámetro optimizado para lecturas ONT
+# -ax map-ont: optimized for ONT reads
 
-# Indexado y estadísticas
+# Indexing and statistics
 samtools index results/mapping/spades_full/ont/ont_mapped.sorted.bam
 samtools flagstat results/mapping/spades_full/ont/ont_mapped.sorted.bam > results/mapping/spades_full/ont/ont_flagstat.txt
 samtools coverage results/mapping/spades_full/ont/ont_mapped.sorted.bam > results/mapping/spades_full/ont/ont_coverage.txt
 
-## === PASO 5: Procesamiento de datos PacBio (3 archivos) ===
-echo "4/5 - Procesando lecturas PacBio (3 archivos)..."
+## === STEP 5: Processing PacBio Data (3 files) ===
+echo "4/5 - Processing PacBio reads (3 files)..."
 
-# Procesamos cada archivo PacBio por separado
+# Process each PacBio file individually
 for i in {1..3}; do
-  echo "Procesando archivo PacBio ${i} de 3..."
-  minimap2 -ax map-pb $ENSAMBLAJE \
+  echo "Processing PacBio file ${i} of 3..."
+  minimap2 -ax map-pb $ASSEMBLY \
     "data/processed/corrected/pacbio_cola50_trim34499_CORRECTED.${i}.subreads.fasta" | \
   samtools view -bS - | \
   samtools sort -o "results/mapping/spades_full/pacbio/pacbio_${i}_mapped.sorted.bam"
-  # -ax map-pb: parámetro para datos PacBio
-  
-  # Generamos índices y estadísticas para cada archivo
+  # -ax map-pb: parameter for PacBio data
+
+  # Generate index and stats for each file
   samtools index "results/mapping/spades_full/pacbio/pacbio_${i}_mapped.sorted.bam"
   samtools flagstat "results/mapping/spades_full/pacbio/pacbio_${i}_mapped.sorted.bam" > "results/mapping/spades_full/pacbio/pacbio_${i}_flagstat.txt"
   samtools coverage "results/mapping/spades_full/pacbio/pacbio_${i}_mapped.sorted.bam" > "results/mapping/spades_full/pacbio/pacbio_${i}_coverage.txt"
 done
 
-## === FINALIZACIÓN ===
-echo "5/5 - Pipeline completado exitosamente!"
-echo "Resultados guardados en:"
+## === FINALIZATION ===
+echo "5/5 - Pipeline completed successfully!"
+echo "Results saved in:"
 echo "- Illumina: results/mapping/spades_full/illumina/"
 echo "- ONT: results/mapping/spades_full/ont/"
 echo "- PacBio: results/mapping/spades_full/pacbio/"
