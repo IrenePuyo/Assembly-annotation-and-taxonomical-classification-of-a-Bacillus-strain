@@ -1,12 +1,12 @@
 #!/bin/bash
-# pacbio_filter.sh - Preprocesamiento de lecturas PacBio
-# Recorte de colas, filtrado por calidad/longitud y verificaciones
+# pacbio_filter.sh - Preprocessing of PacBio reads
+# Tail trimming, quality/length filtering, and validation steps
 
 #############################
-### CONFIGURACIÓN INICIAL ###
+### INITIAL CONFIGURATION ###
 #############################
 
-# Directorios
+# Directories
 INPUT_DIR="data/raw/pacbio"
 OUTPUT_DIR="data/processed/pacbio"
 LOG_DIR="logs"
@@ -14,58 +14,58 @@ QC_DIR="results/qc/pacbio"
 
 mkdir -p ${OUTPUT_DIR} ${LOG_DIR} ${QC_DIR}
 
-# Archivos de entrada
+# Input files
 PACBIO_FILES=(
     "m180704_113818_42146_c101474342550000001823318302141971_s1_p0.1.subreads.fastq"
     "m180704_113818_42146_c101474342550000001823318302141971_s1_p0.2.subreads.fastq"
     "m180704_113818_42146_c101474342550000001823318302141971_s1_p0.3.subreads.fastq"
 )
 
-# Parámetros de filtrado (ajustados a prueba y error comparando fastqcs)
+# Filtering parameters (tuned by trial and error using FastQC comparisons)
 MIN_LENGTH=1000          
 MIN_QUAL=9               
 TRIM_TAIL=50             
 TRIM_TO_LENGTH=34499     
 
 ###########################
-### FUNCIONES DE CONTROL ##
+### HELPER FUNCTIONS #####
 ###########################
 
-# Función para registro de logs
+# Logging function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a ${LOG_FILE}
 }
 
-# Función para verificar archivos
+# Check file existence
 check_file() {
     if [ ! -f "$1" ]; then
-        log "ERROR: Archivo no encontrado: $1"
+        log "ERROR: File not found: $1"
         exit 1
     fi
 }
 
 ###########################
-### PROCESAMIENTO #########
+### PROCESSING PIPELINE ###
 ###########################
 
 LOG_FILE="${LOG_DIR}/pacbio_preprocess_$(date +%Y%m%d).log"
-log "=== INICIO DE PROCESAMIENTO PACBIO ==="
+log "=== STARTING PACBIO PROCESSING ==="
 
 for file in "${PACBIO_FILES[@]}"; do
-    # Definir nombres de archivos
+    # Define file names
     base_name=$(basename ${file} .fastq)
     input_file="${INPUT_DIR}/${file}"
     output_good="${OUTPUT_DIR}/FILTERED_${base_name}.fastq"
     output_bad="${OUTPUT_DIR}/LOW_QUALITY_${base_name}.fastq"
     trimmed_output="${OUTPUT_DIR}/TRIMMED_FILTERED_${base_name}.fastq"
 
-    # Verificar archivo de entrada
+    # Check input file
     check_file ${input_file}
     
     ####################################
-    ### PASO 1: Filtrado inicial #######
+    ### STEP 1: Initial filtering ######
     ####################################
-    log "Procesando ${file} - Filtrado inicial..."
+    log "Processing ${file} - Initial filtering..."
     
     prinseq-lite -fastq ${input_file} \
         -out_good ${output_good} \
@@ -75,14 +75,14 @@ for file in "${PACBIO_FILES[@]}"; do
         -trim_tail_right ${TRIM_TAIL} 2>> ${LOG_FILE}
     
     if [ $? -ne 0 ]; then
-        log "ERROR en filtrado inicial de ${file}"
+        log "ERROR during initial filtering of ${file}"
         exit 1
     fi
 
-    ####################################
-    ### PASO 2: Trimming a longitud fija
-    ####################################
-    log "Procesando ${file} - Trimming a ${TRIM_TO_LENGTH}bp..."
+    ##########################################
+    ### STEP 2: Fixed-length trimming ########
+    ##########################################
+    log "Processing ${file} - Trimming to ${TRIM_TO_LENGTH}bp..."
     
     prinseq-lite -fastq ${output_good} \
         -trim_to ${TRIM_TO_LENGTH} \
@@ -90,26 +90,26 @@ for file in "${PACBIO_FILES[@]}"; do
         -out_bad null 2>> ${LOG_FILE}
     
     if [ $? -ne 0 ]; then
-        log "ERROR en trimming de ${file}"
+        log "ERROR during trimming of ${file}"
         exit 1
     fi
 
     ####################################
-    ### PASO 3: Control de calidad ####
+    ### STEP 3: Quality Control ########
     ####################################
-    log "Generando reporte de calidad para ${trimmed_output}..."
+    log "Generating quality report for ${trimmed_output}..."
     
     fastqc -o ${QC_DIR} ${trimmed_output} 2>> ${LOG_FILE}
 done
 
-####################################
-### PASO 4: Reporte consolidado ####
-####################################
-log "Generando reporte MultiQC..."
+#########################################
+### STEP 4: Consolidated QC report ######
+#########################################
+log "Generating MultiQC report..."
 
 multiqc ${QC_DIR} -o ${QC_DIR} --filename multiqc_report_pacbio 2>> ${LOG_FILE}
 
-log "=== PROCESAMIENTO COMPLETADO ==="
-log "Resultados en: ${OUTPUT_DIR}"
-log "Reportes de calidad en: ${QC_DIR}"
-log "Detalles completos en: ${LOG_FILE}"
+log "=== PROCESSING COMPLETED ==="
+log "Results located in: ${OUTPUT_DIR}"
+log "Quality reports in: ${QC_DIR}"
+log "Full log: ${LOG_FILE}"
