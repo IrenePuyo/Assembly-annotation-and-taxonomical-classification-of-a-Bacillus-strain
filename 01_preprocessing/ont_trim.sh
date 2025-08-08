@@ -1,12 +1,12 @@
 #!/bin/bash
-# ont_trim.sh - Preprocesamiento de lecturas Oxford Nanopore
-# Incluye: Recorte de bases de peor calidad, filtrado por calidad/longitud y verificaciones
+# ont_trim.sh - Preprocessing of Oxford Nanopore reads
+# Includes: Low-quality base trimming, quality/length filtering, and checks
 
 #############################
-### CONFIGURACIÓN INICIAL ###
+### INITIAL CONFIGURATION ###
 #############################
 
-# Directorios
+# Directories
 INPUT_DIR="data/raw/ont"
 OUTPUT_DIR="data/processed/ont"
 LOG_DIR="logs"
@@ -14,56 +14,56 @@ QC_DIR="results/qc/ont"
 
 mkdir -p ${OUTPUT_DIR} ${LOG_DIR} ${QC_DIR}
 
-# Archivos de entrada
+# Input files
 ONT_FILES=(
-    "3_bacillusX23ori.fastq"      # Archivo original
-    "6_bacillusX23_filtrado.fastq" # Archivo pre-filtrado
+    "3_bacillusX23ori.fastq"       # Original file
+    "6_bacillusX23_filtrado.fastq" # Pre-filtered file
 )
 
-# Parámetros de filtrado (optimizados a prueba y error comparando fastqc)
+# Filtering parameters (optimized by trial and error comparing FastQC reports)
 TRIM_LEFT=504            
 MIN_LENGTH=1000          
 MIN_QUAL=20              
 TRIM_TO_LENGTH=34499     
 
 ###########################
-### FUNCIONES DE CONTROL ##
+### HELPER FUNCTIONS #####
 ###########################
 
-# Función para registro de logs
+# Logging function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a ${LOG_FILE}
 }
 
-# Función para verificar archivos
+# File existence check
 check_file() {
     if [ ! -f "$1" ]; then
-        log "ERROR: Archivo no encontrado: $1"
+        log "ERROR: File not found: $1"
         exit 1
     fi
 }
 
 ###########################
-### PROCESAMIENTO #########
+### PROCESSING PIPELINE ###
 ###########################
 
 LOG_FILE="${LOG_DIR}/ont_preprocess_$(date +%Y%m%d).log"
-log "=== INICIO DE PROCESAMIENTO ONT ==="
+log "=== STARTING ONT PREPROCESSING ==="
 
 for file in "${ONT_FILES[@]}"; do
-    # Definir nombres de archivos
+    # Define file names
     base_name=$(basename ${file} .fastq)
     input_file="${INPUT_DIR}/${file}"
     trimmed_output="${OUTPUT_DIR}/${base_name}_trim${TRIM_LEFT}.fastq"
     final_output="${OUTPUT_DIR}/${base_name}_final.fastq"
 
-    # Verificar archivo de entrada
+    # Check input file
     check_file ${input_file}
     
     ####################################
-    ### PASO 1: Recorte inicial ########
+    ### STEP 1: Initial trimming #######
     ####################################
-    log "Procesando ${file} - Recorte desde posición ${TRIM_LEFT}..."
+    log "Processing ${file} - Trimming from position ${TRIM_LEFT}..."
     
     prinseq-lite -fastq ${input_file} \
         -trim_left ${TRIM_LEFT} \
@@ -72,14 +72,14 @@ for file in "${ONT_FILES[@]}"; do
         -out_bad null 2>> ${LOG_FILE}
     
     if [ $? -ne 0 ]; then
-        log "ERROR en recorte de ${file}"
+        log "ERROR during initial trimming of ${file}"
         exit 1
     fi
 
-    ####################################
-    ### PASO 2: Filtrado por longitud ##
-    ####################################
-    log "Filtrando ${file} por longitud mínima ${MIN_LENGTH}bp..."
+    ##########################################
+    ### STEP 2: Minimum length filtering #####
+    ##########################################
+    log "Filtering ${file} by minimum length ${MIN_LENGTH}bp..."
     
     prinseq-lite -fastq "${OUTPUT_DIR}/intermediate_${base_name}.fastq" \
         -min_len ${MIN_LENGTH} \
@@ -87,14 +87,14 @@ for file in "${ONT_FILES[@]}"; do
         -out_bad null 2>> ${LOG_FILE}
     
     if [ $? -ne 0 ]; then
-        log "ERROR en filtrado de longitud de ${file}"
+        log "ERROR during length filtering of ${file}"
         exit 1
     fi
 
     ####################################
-    ### PASO 3: Recorte a longitud fija
+    ### STEP 3: Fixed-length trimming ##
     ####################################
-    log "Recortando ${file} a ${TRIM_TO_LENGTH}bp..."
+    log "Trimming ${file} to fixed length ${TRIM_TO_LENGTH}bp..."
     
     prinseq-lite -fastq ${trimmed_output} \
         -trim_to ${TRIM_TO_LENGTH} \
@@ -102,29 +102,29 @@ for file in "${ONT_FILES[@]}"; do
         -out_bad null 2>> ${LOG_FILE}
     
     if [ $? -ne 0 ]; then
-        log "ERROR en recorte final de ${file}"
+        log "ERROR during final trimming of ${file}"
         exit 1
     fi
 
     ####################################
-    ### PASO 4: Control de calidad ####
+    ### STEP 4: Quality Control ########
     ####################################
-    log "Generando reporte de calidad para ${final_output}..."
+    log "Generating quality report for ${final_output}..."
     
     fastqc -o ${QC_DIR} ${final_output} 2>> ${LOG_FILE}
 
-    # Limpieza de archivos intermedios
+    # Clean up intermediate files
     rm "${OUTPUT_DIR}/intermediate_${base_name}.fastq"
 done
 
 ####################################
-### PASO 5: Reporte consolidado ####
+### STEP 5: Consolidated report ####
 ####################################
-log "Generando reporte MultiQC..."
+log "Generating MultiQC report..."
 
 multiqc ${QC_DIR} -o ${QC_DIR} --filename multiqc_report_ont 2>> ${LOG_FILE}
 
-log "=== PROCESAMIENTO COMPLETADO ==="
-log "Resultados finales en: ${OUTPUT_DIR}"
-log "Reportes de calidad en: ${QC_DIR}"
-log "Detalles completos en: ${LOG_FILE}"
+log "=== PROCESSING COMPLETED ==="
+log "Final results in: ${OUTPUT_DIR}"
+log "Quality reports in: ${QC_DIR}"
+log "Full details in: ${LOG_FILE}"
